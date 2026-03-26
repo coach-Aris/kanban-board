@@ -15,21 +15,55 @@ const COLUMN_COLORS = [
 ];
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('google_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+  const [token, setToken] = useState(() => localStorage.getItem('google_token'));
   const [items, setItems] = useState([]);
   const [columns, setColumns] = useState(FIXED_COLUMNS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Validate stored token on mount
+  useEffect(() => {
+    const storedToken = localStorage.getItem('google_token');
+    if (!storedToken) return;
+
+    fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${storedToken}`, {
+      headers: { Authorization: `Bearer ${storedToken}`, Accept: 'application/json' },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Token expired');
+        return res.json();
+      })
+      .then((res) => {
+        setUser(res);
+        localStorage.setItem('google_user', JSON.stringify(res));
+      })
+      .catch(() => {
+        localStorage.removeItem('google_token');
+        localStorage.removeItem('google_user');
+        setToken(null);
+        setUser(null);
+      });
+  }, []);
+
   const login = useGoogleLogin({
     onSuccess: (codeResponse) => {
-      setToken(codeResponse.access_token);
-      fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${codeResponse.access_token}`, {
-        headers: { Authorization: `Bearer ${codeResponse.access_token}`, Accept: 'application/json' },
+      const accessToken = codeResponse.access_token;
+      setToken(accessToken);
+      localStorage.setItem('google_token', accessToken);
+      fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${accessToken}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
       })
         .then((res) => res.json())
-        .then((res) => setUser(res))
+        .then((res) => {
+          setUser(res);
+          localStorage.setItem('google_user', JSON.stringify(res));
+        })
         .catch(console.error);
     },
     onError: (err) => console.log('Login Failed:', err),
@@ -38,6 +72,8 @@ function App() {
 
   const logOut = () => {
     googleLogout();
+    localStorage.removeItem('google_token');
+    localStorage.removeItem('google_user');
     setUser(null);
     setToken(null);
     setItems([]);
