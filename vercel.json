@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://content-app-e4022.firebaseapp.com/__/auth/:path*"
+    }
+  ]
+}

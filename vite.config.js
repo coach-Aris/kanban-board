@@ -8,6 +8,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Firebase-Auth-Handler nicht durch den Service Worker auf index.html umleiten
+      workbox: { navigateFallbackDenylist: [/^\/__\//] },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
         name: 'Content Kanban',

@@ -2,10 +2,14 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
+// Ausserhalb von localhost laeuft der Auth-Handler ueber die eigene Domain (Rewrite in vercel.json),
+// sonst blockieren Safari und iOS-PWA die Anmeldung als Drittanbieter-Zugriff.
+const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
 // Web-Konfiguration ist oeffentlich; Zugriff schuetzen Auth und Firestore-Regeln.
 const firebaseConfig = {
   apiKey: 'AIzaSyBEveMogSlW-T0xUowgX-P111Pjh2iuJ9s',
-  authDomain: 'content-app-e4022.firebaseapp.com',
+  authDomain: isLocal ? 'content-app-e4022.firebaseapp.com' : window.location.host,
   projectId: 'content-app-e4022',
   storageBucket: 'content-app-e4022.firebasestorage.app',
   messagingSenderId: '372707937763',

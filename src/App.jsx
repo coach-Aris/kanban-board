@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { LayoutDashboard, LogOut, Upload, FileText, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchSheetData } from './sheetsApi';
@@ -17,6 +17,12 @@ const COLUMN_COLORS = [
   '#10b981', // Emerald
 ];
 const ALLOWED_SCRIPT_LINK_HOSTS = new Set(['docs.google.com', 'drive.google.com']);
+
+// Als Homescreen-App (PWA) kommen Popups nicht zurueck in die App, dort per Redirect anmelden
+const isStandalone =
+  window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const REDIRECT_FALLBACK_ERRORS = new Set(['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment']);
+const IGNORED_LOGIN_ERRORS = new Set(['auth/popup-closed-by-user', 'auth/cancelled-popup-request']);
 
 const getSafeScriptLink = (link) => {
   if (!link) return null;
@@ -48,6 +54,11 @@ function App() {
     [],
   );
 
+  // Fehler aus einer Redirect-Anmeldung kommen erst nach dem Neuladen an
+  useEffect(() => {
+    getRedirectResult(auth).catch((err) => setError(err.message));
+  }, []);
+
   useEffect(() => {
     if (!user) return undefined;
     return subscribeVideos(
@@ -62,7 +73,22 @@ function App() {
     );
   }, [user]);
 
-  const login = () => signInWithPopup(auth, googleProvider).catch((err) => setError(err.message));
+  const login = async () => {
+    setError(null);
+    try {
+      if (isStandalone) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      if (REDIRECT_FALLBACK_ERRORS.has(err.code)) {
+        await signInWithRedirect(auth, googleProvider).catch((e) => setError(e.message));
+      } else if (!IGNORED_LOGIN_ERRORS.has(err.code)) {
+        setError(err.message);
+      }
+    }
+  };
   const logOut = () => signOut(auth);
 
   // Einmaliger Import aus dem alten Google Sheet
@@ -149,6 +175,7 @@ function App() {
           <button className="login-btn" onClick={login}>
             Mit Google Workspace starten
           </button>
+          {error && <p style={{ color: 'var(--accent-red)' }}>Anmeldung fehlgeschlagen: {error}</p>}
         </div>
       ) : !loaded ? (
         <div className="loading-screen">
