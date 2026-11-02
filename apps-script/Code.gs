@@ -5,7 +5,7 @@
  *  1. Neue Google Docs im Skript-Ordner  -> neues Video (Status "Aufnahme")
  *  2. Skript aus dem Ordner entfernt     -> Video wird geloescht
  *  3. Neue YouTube-Uploads               -> neues Video (Status "Upload")
- *  4. YouTube-Statistiken                -> Views/Likes/Kommentare + Tagesverlauf
+ *  4. YouTube-Statistiken                -> Views/Likes/Kommentare, Veroeffentlichungsdatum + Tagesverlauf
  *
  * Einrichtung (einmalig):
  *  - Projekteinstellungen > Google-Cloud-Projekt: Projektnummer 372707937763
@@ -133,7 +133,7 @@ function updateYoutubeStats(videos) {
     const today = Utilities.formatDate(new Date(), CONFIG.timeZone, 'yyyy-MM-dd');
 
     for (let i = 0; i < ytIds.length; i += 50) {
-      const res = YouTube.Videos.list('statistics', { id: ytIds.slice(i, i + 50).join(',') });
+      const res = YouTube.Videos.list('snippet,statistics', { id: ytIds.slice(i, i + 50).join(',') });
       (res.items || []).forEach((item) => {
         const stats = {
           views: Number(item.statistics.viewCount || 0),
@@ -141,7 +141,7 @@ function updateYoutubeStats(videos) {
           comments: Number(item.statistics.commentCount || 0),
         };
         docsByYtId[item.id].forEach((docId) => {
-          patchDocument('videos/' + docId, stats);
+          patchDocument('videos/' + docId, Object.assign({ publishedAt: item.snippet.publishedAt }, stats));
           patchDocument('videos/' + docId + '/stats/' + today, Object.assign({ date: today }, stats));
         });
       });

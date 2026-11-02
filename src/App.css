@@ -305,6 +305,38 @@ h1 {
   color: var(--accent-blue);
 }
 
+/* YouTube-Spalte: Karten sind Links, nicht ziehbar */
+.yt-card {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.yt-card:active {
+  cursor: pointer;
+}
+
+.yt-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #e2e8f0;
+}
+
+.yt-stats {
+  justify-content: flex-start;
+  gap: 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.yt-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 /* ========================
      UTILITY SCREENS
      ======================== */

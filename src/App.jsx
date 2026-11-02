@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { LayoutDashboard, LogOut, Upload, FileText, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, LogOut, Upload, FileText, ExternalLink, ChevronLeft, ChevronRight, Eye, ThumbsUp, MessageCircle } from 'lucide-react';
 import { fetchSheetData } from './sheetsApi';
 import { auth, googleProvider } from './firebase';
 import { subscribeVideos, updateVideoStatus, importVideos } from './videosDb';
@@ -16,7 +16,9 @@ const COLUMN_COLORS = [
   '#3b82f6', // Blue
   '#10b981', // Emerald
 ];
+const YOUTUBE_COLOR = '#ef4444'; // Red
 const ALLOWED_SCRIPT_LINK_HOSTS = new Set(['docs.google.com', 'drive.google.com']);
+const YOUTUBE_HOSTS = new Set(['www.youtube.com', 'youtube.com', 'm.youtube.com', 'youtu.be']);
 
 // Als Homescreen-App (PWA) kommen Popups nicht zurueck in die App, dort per Redirect anmelden
 const isStandalone =
@@ -37,6 +39,26 @@ const getSafeScriptLink = (link) => {
     return null;
   }
 };
+
+// Video-ID aus einem YouTube-Link; null, wenn der Link nicht eindeutig auf YouTube zeigt
+const getYoutubeId = (link) => {
+  if (!link) return null;
+
+  try {
+    const url = new URL(link);
+    if (url.protocol !== 'https:') return null;
+    if (!YOUTUBE_HOSTS.has(url.hostname)) return null;
+
+    const id = url.hostname === 'youtu.be'
+      ? url.pathname.slice(1)
+      : url.searchParams.get('v') || url.pathname.split('/shorts/')[1];
+    return /^[\w-]{11}$/.test(id || '') ? id : null;
+  } catch {
+    return null;
+  }
+};
+
+const formatCount = (n) => new Intl.NumberFormat('de-CH').format(Number(n) || 0);
 
 function App() {
   const [user, setUser] = useState(null);
@@ -133,8 +155,15 @@ function App() {
     return 'tag-default';
   };
 
+  // Videos mit YouTube-Link stehen nur in der YouTube-Spalte
+  const isOnYoutube = (item) => Boolean(getYoutubeId(item.youtubeUrl));
+
   const getItemsByStatus = (status) =>
-    items.filter(i => i.status === status || (!i.status && status === FIXED_COLUMNS[0]));
+    items.filter(i => !isOnYoutube(i) && (i.status === status || (!i.status && status === FIXED_COLUMNS[0])));
+
+  const youtubeItems = items
+    .filter(isOnYoutube)
+    .sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || '') || (b.order ?? 0) - (a.order ?? 0));
 
   return (
     <div className="app-container">
@@ -272,6 +301,56 @@ function App() {
                   </div>
                 );
               })}
+
+              {/* YouTube: nur Anzeige, Daten kommen vom Apps-Script-Sync */}
+              <div className="column glass-panel">
+                <div className="column-header">
+                  <div className="column-header-inner">
+                    <span className="column-dot" style={{ background: YOUTUBE_COLOR }} />
+                    <h3>YouTube</h3>
+                  </div>
+                  <span className="item-count">{youtubeItems.length}</span>
+                </div>
+
+                <div className="column-content">
+                  {youtubeItems.length === 0 && (
+                    <p className="empty-col">Keine Videos</p>
+                  )}
+                  {youtubeItems.map((item) => {
+                    const ytId = getYoutubeId(item.youtubeUrl);
+
+                    return (
+                      <a
+                        key={item.id}
+                        className="card glass-card yt-card"
+                        href={`https://www.youtube.com/watch?v=${ytId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ borderLeft: `3px solid ${YOUTUBE_COLOR}` }}
+                      >
+                        <img
+                          className="yt-thumb"
+                          src={`https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`}
+                          alt=""
+                          loading="lazy"
+                        />
+                        <div className="card-top">
+                          <span className="card-tag tag-youtube">{item.format || 'Youtube'}</span>
+                          {item.publishedAt && (
+                            <span className="card-id">{new Date(item.publishedAt).toLocaleDateString('de-CH')}</span>
+                          )}
+                        </div>
+                        <h4 className="card-title">{item.title || 'Ohne Titel'}</h4>
+                        <div className="card-footer yt-stats">
+                          <span title="Views"><Eye size={14} /> {formatCount(item.views)}</span>
+                          <span title="Likes"><ThumbsUp size={14} /> {formatCount(item.likes)}</span>
+                          <span title="Kommentare"><MessageCircle size={14} /> {formatCount(item.comments)}</span>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </DragDropContext>
         </>
